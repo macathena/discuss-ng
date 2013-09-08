@@ -1,0 +1,14 @@
+Source: debathena-discuss-ng
+Section: debathena/net
+Priority: extra
+Maintainer: Debathena Project <debathena@mit.edu>
+Build-Depends: debhelper (>= 7), python (>= 2.7), bash-completion
+Standards-Version: 3.9.4
+X-Debathena-No-Build: lucid squeeze
+
+Package: debathena-discuss-ng
+Architecture: all
+Depends: ${shlibs:Depends}, ${misc:Depends}, ${python:Depends}, python (>= 2.7), python-discuss
+Description: Conferencing and mail archiving system -- new client
+ discuss-ng provides an ncurses-based discuss client coupled with an auxilary
+ program to manipulate meeting subscription.
