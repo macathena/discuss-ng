@@ -1,0 +1,34 @@
+_discuss_mtg()
+{
+    local cur="${COMP_WORDS[$COMP_CWORD]}"
+    COMPREPLY=( $(meeting complete "$cur")  )
+}
+
+_meeting()
+{
+    local cmds="add list listacl setacl"
+    local cur="${COMP_WORDS[$COMP_CWORD]}"
+
+    COMPREPLY=()
+
+    if [ $COMP_CWORD -eq 1 ]; then
+        COMPREPLY=( $(compgen -W "$cmds" -- "$cur") );
+    elif [ $COMP_CWORD -eq 2 ]; then
+        if [ "${COMP_WORDS[1]}" = "listacl" -o "${COMP_WORDS[1]}" = "setacl" ]; then
+            _discuss_mtg;
+        fi
+    fi
+
+    return 0
+
+}
+
+_ndsc()
+{
+    if [ $COMP_CWORD -eq 1 ]; then
+        _discuss_mtg;
+    fi
+}
+
+complete -F _meeting meeting
+complete -F _ndsc ndsc
