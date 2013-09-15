@@ -12,6 +12,7 @@ from __future__ import print_function
 import curses, discuss  # discuss always comes with curses
 
 import argparse
+import bisect
 import locale
 import signal
 import sys
@@ -20,6 +21,7 @@ import sys
 pos_cur = 0
 pos_top = 0
 viewed_transaction = None
+delete_stack = []
 
 # Functions
 
@@ -198,6 +200,36 @@ def handle_transaction_view():
     viewed_transaction.text = viewed_transaction.get_text()
     textpos_y = textpos_x = 0
 
+def handle_transaction_delete():
+    # Do not allow the meeting to become empty
+    if len(transactions) < 2:
+        return
+
+    trn = transactions[pos_cur]
+
+    trn.delete()
+    del transactions[pos_cur]
+
+    delete_stack.append(trn)
+
+def handle_transaction_undelete():
+    if not delete_stack:
+        return
+
+    trn = delete_stack.pop()
+
+    try:
+        trn.meeting.undelete_transaction(trn.number)
+    except discuss.DiscussError as err:
+        # If transaction was expunged, there is nothing we can do, but this should
+        # not crash the client
+        if err.code == discuss.constants.EXPUNGED_TRN:
+            return
+        else:
+            raise err
+
+    transactions.insert(bisect.bisect_left(transactions, trn), trn)
+
 def main_loop():
     global pos_cur, pos_top, viewed_transaction
     global textpos_y, textpos_x
@@ -235,6 +267,10 @@ def main_loop():
                 pos_top = pos_cur - rows
             if ch == ord('\n'):
                 handle_transaction_view()
+            if ch == ord('x'):
+                handle_transaction_delete()
+            if ch == ord('u'):
+                handle_transaction_undelete()
         else:
             if ch == ord('q'):
                 viewed_transaction = None
