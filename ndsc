@@ -171,6 +171,8 @@ def redraw():
             screen.addstr(2 + i, 3, text)
 
     footer = " %i/%i " % (pos_cur + 1, len(transactions))
+    if status_bar:
+        footer += "─── %s " % status_bar
     screen.addstr(max_y-2, 6, footer)
 
     if viewed_transaction:
@@ -201,64 +203,84 @@ def handle_transaction_view():
     textpos_y = textpos_x = 0
 
 def handle_transaction_delete():
+    target = transactions[pos_cur:pos_cur + multiplier]
+
     # Do not allow the meeting to become empty
-    if len(transactions) < 2:
+    if len(transactions) - len(target) < 1:
         return
 
-    trn = transactions[pos_cur]
+    for trn in target:
+        trn.delete()
+    del transactions[pos_cur:pos_cur + multiplier]
+    del transaction_numbers[pos_cur:pos_cur + multiplier]
 
-    trn.delete()
-    del transactions[pos_cur]
-
-    delete_stack.append(trn)
+    delete_stack.append(target)
 
 def handle_transaction_undelete():
-    if not delete_stack:
-        return
+    trns = []
+    for i in range(multiplier):
+        try:
+            trns += delete_stack.pop()
+        except IndexError:
+            break
 
-    trn = delete_stack.pop()
+    for trn in trns:
+        try:
+            trn.meeting.undelete_transaction(trn.number)
+        except discuss.DiscussError as err:
+            # If transaction was expunged, there is nothing we can do, but this should
+            # not crash the client
+            if err.code == discuss.constants.EXPUNGED_TRN:
+                status_bar = 'Cannot undelete [%i] because it is expunged' % trn.number
+            else:
+                raise err
 
-    try:
-        trn.meeting.undelete_transaction(trn.number)
-    except discuss.DiscussError as err:
-        # If transaction was expunged, there is nothing we can do, but this should
-        # not crash the client
-        if err.code == discuss.constants.EXPUNGED_TRN:
-            return
-        else:
-            raise err
+        new_pos = bisect.bisect_left(transactions, trn)
+        transactions.insert(new_pos, trn)
+        transaction_numbers.insert(new_pos, trn.number)
 
-    transactions.insert(bisect.bisect_left(transactions, trn), trn)
+def reset_multiplier():
+    global status_bar, multiplier_acc
+
+    status_bar = ''
+    multiplier_acc = ''
 
 def main_loop():
     global pos_cur, pos_top, viewed_transaction
     global textpos_y, textpos_x
     global max_number, max_sender_len
+    global status_bar, multiplier_acc, multiplier
+    global transaction_numbers
 
     screen.nodelay(False)
     screen.keypad(True)
 
-    max_number = max(trn.number for trn in transactions)
+    transaction_numbers = [trn.number for trn in transactions]
+
+    max_number = max(transaction_numbers)
     max_sender_len = max(len(trn.signature) for trn in transactions)
 
+    reset_multiplier()
     redraw()
 
     while True:
         ch = screen.getch()
 
         if viewed_transaction == None:
+            multiplier = int(multiplier_acc) if multiplier_acc else 1
+
             if ch == ord('q'):
                 return
-            if ch == curses.KEY_DOWN:
-                pos_cur += 1
-            if ch == curses.KEY_UP:
-                pos_cur -= 1
+            if ch == curses.KEY_DOWN or ch == ord('j'):
+                pos_cur += multiplier
+            if ch == curses.KEY_UP or ch == ord('k'):
+                pos_cur -= multiplier
             if ch == curses.KEY_PPAGE:
-                pos_top -= rows
-                pos_cur -= rows
+                pos_top -= rows * multiplier
+                pos_cur -= rows * multiplier
             if ch == curses.KEY_NPAGE:
-                pos_top += rows
-                pos_cur += rows
+                pos_top += rows * multiplier
+                pos_cur += rows * multiplier
             if ch == curses.KEY_HOME:
                 pos_cur = 0
                 pos_top = 0
@@ -271,6 +293,14 @@ def main_loop():
                 handle_transaction_delete()
             if ch == ord('u'):
                 handle_transaction_undelete()
+            if ch == ord('g'):
+                pos_cur = bisect.bisect_left(transaction_numbers, multiplier)
+
+            if ch >= ord('0') and ch <= ord('9'):
+                multiplier_acc = multiplier_acc + chr(ch)
+                status_bar = multiplier_acc
+            else:
+                reset_multiplier()
         else:
             if ch == ord('q'):
                 viewed_transaction = None
