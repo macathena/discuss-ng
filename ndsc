@@ -231,6 +231,27 @@ def handle_transaction_undelete():
         transactions.insert(new_pos, trn)
         transaction_numbers.insert(new_pos, trn.number)
 
+def handle_refresh():
+    global transactions, transaction_numbers
+    global max_number, max_sender_len
+
+    meeting.load_info(force = True)
+    old_end = transactions[-1].number
+    new_end = meeting.last
+
+    if old_end >= new_end:
+        return
+
+    new_transactions = meeting.transactions(old_end + 1, new_end)
+    if not new_transactions:
+        return
+
+    transactions += new_transactions
+
+    transaction_numbers += [trn.number for trn in transactions]
+    max_number = new_transactions[-1].number
+    max_sender_len = max(max_sender_len, max(len(trn.signature) for trn in new_transactions))
+
 def reset_multiplier():
     global status_bar, multiplier_acc
 
@@ -288,6 +309,8 @@ def main_loop():
                     handle_transaction_undelete()
                 if ch == ord('g'):
                     pos_cur = bisect.bisect_left(transaction_numbers, multiplier)
+                if ch == ord('r'):
+                    handle_refresh()
 
                 if ch >= ord('0') and ch <= ord('9'):
                     multiplier_acc = multiplier_acc + chr(ch)
