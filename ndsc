@@ -12,6 +12,7 @@ from __future__ import print_function
 import curses, discuss  # discuss always comes with curses
 
 import argparse
+import bisect
 import locale
 import signal
 import sys
@@ -20,6 +21,7 @@ import sys
 pos_cur = 0
 pos_top = 0
 viewed_transaction = None
+delete_stack = []
 
 # Functions
 
@@ -169,6 +171,8 @@ def redraw():
             screen.addstr(2 + i, 3, text)
 
     footer = " %i/%i " % (pos_cur + 1, len(transactions))
+    if status_bar:
+        footer += "─── %s " % status_bar
     screen.addstr(max_y-2, 6, footer)
 
     if viewed_transaction:
@@ -198,68 +202,148 @@ def handle_transaction_view():
     viewed_transaction.text = viewed_transaction.get_text()
     textpos_y = textpos_x = 0
 
+def handle_transaction_delete():
+    target = transactions[pos_cur:pos_cur + multiplier]
+
+    # Do not allow the meeting to become empty
+    if len(transactions) - len(target) < 1:
+        return
+
+    for trn in target:
+        trn.delete()
+    del transactions[pos_cur:pos_cur + multiplier]
+    del transaction_numbers[pos_cur:pos_cur + multiplier]
+
+    delete_stack.append(target)
+
+def handle_transaction_undelete():
+    trns = []
+    for i in range(multiplier):
+        try:
+            trns += delete_stack.pop()
+        except IndexError:
+            break
+
+    for trn in trns:
+        trn.meeting.undelete_transaction(trn.number)
+
+        new_pos = bisect.bisect_left(transactions, trn)
+        transactions.insert(new_pos, trn)
+        transaction_numbers.insert(new_pos, trn.number)
+
+def handle_refresh():
+    global transactions, transaction_numbers
+    global max_number, max_sender_len
+
+    meeting.load_info(force = True)
+    old_end = transactions[-1].number
+    new_end = meeting.last
+
+    if old_end >= new_end:
+        return
+
+    new_transactions = meeting.transactions(old_end + 1, new_end)
+    if not new_transactions:
+        return
+
+    transactions += new_transactions
+
+    transaction_numbers += [trn.number for trn in transactions]
+    max_number = new_transactions[-1].number
+    max_sender_len = max(max_sender_len, max(len(trn.signature) for trn in new_transactions))
+
+def reset_multiplier():
+    global status_bar, multiplier_acc
+
+    status_bar = ''
+    multiplier_acc = ''
+
 def main_loop():
     global pos_cur, pos_top, viewed_transaction
     global textpos_y, textpos_x
     global max_number, max_sender_len
+    global status_bar, multiplier_acc, multiplier
+    global transaction_numbers
 
     screen.nodelay(False)
     screen.keypad(True)
 
-    max_number = max(trn.number for trn in transactions)
+    transaction_numbers = [trn.number for trn in transactions]
+
+    max_number = max(transaction_numbers)
     max_sender_len = max(len(trn.signature) for trn in transactions)
 
+    reset_multiplier()
     redraw()
 
     while True:
         ch = screen.getch()
 
-        if viewed_transaction == None:
-            if ch == ord('q'):
-                return
-            if ch == curses.KEY_DOWN:
-                pos_cur += 1
-            if ch == curses.KEY_UP:
-                pos_cur -= 1
-            if ch == curses.KEY_PPAGE:
-                pos_top -= rows
-                pos_cur -= rows
-            if ch == curses.KEY_NPAGE:
-                pos_top += rows
-                pos_cur += rows
-            if ch == curses.KEY_HOME:
-                pos_cur = 0
-                pos_top = 0
-            if ch == curses.KEY_END:
-                pos_cur = len(transactions) - 1
-                pos_top = pos_cur - rows
-            if ch == ord('\n'):
-                handle_transaction_view()
-        else:
-            if ch == ord('q'):
-                viewed_transaction = None
-            if ch == curses.KEY_DOWN:
-                textpos_y += 1
-            if ch == curses.KEY_UP:
-                textpos_y -= 1
-            if ch == curses.KEY_RIGHT:
-                textpos_x += 5
-            if ch == curses.KEY_LEFT:
-                textpos_x -= 5
-            if ch == ord('\n'):
-                textpos_y += 1
-            if ch == ord(' '):
-                textpos_y += rows - 5
-            if ch == curses.KEY_NPAGE:
-                textpos_y += rows - 2
-            if ch == curses.KEY_PPAGE:
-                textpos_y -= rows - 2
-            if ch == ord('['):
-                pos_cur -= 1
-                handle_transaction_view()
-            if ch == ord(']'):
-                pos_cur += 1
-                handle_transaction_view()
+        try:
+            if viewed_transaction == None:
+                multiplier = int(multiplier_acc) if multiplier_acc else 1
+
+                if ch == ord('q'):
+                    return
+                if ch == curses.KEY_DOWN or ch == ord('j'):
+                    pos_cur += multiplier
+                if ch == curses.KEY_UP or ch == ord('k'):
+                    pos_cur -= multiplier
+                if ch == curses.KEY_PPAGE:
+                    pos_top -= rows * multiplier
+                    pos_cur -= rows * multiplier
+                if ch == curses.KEY_NPAGE:
+                    pos_top += rows * multiplier
+                    pos_cur += rows * multiplier
+                if ch == curses.KEY_HOME:
+                    pos_cur = 0
+                    pos_top = 0
+                if ch == curses.KEY_END:
+                    pos_cur = len(transactions) - 1
+                    pos_top = pos_cur - rows
+                if ch == ord('\n'):
+                    handle_transaction_view()
+                if ch == ord('x'):
+                    handle_transaction_delete()
+                if ch == ord('u'):
+                    handle_transaction_undelete()
+                if ch == ord('g'):
+                    pos_cur = bisect.bisect_left(transaction_numbers, multiplier)
+                if ch == ord('r'):
+                    handle_refresh()
+
+                if ch >= ord('0') and ch <= ord('9'):
+                    multiplier_acc = multiplier_acc + chr(ch)
+                    status_bar = multiplier_acc
+                else:
+                    reset_multiplier()
+            else:
+                if ch == ord('q'):
+                    viewed_transaction = None
+                if ch == curses.KEY_DOWN:
+                    textpos_y += 1
+                if ch == curses.KEY_UP:
+                    textpos_y -= 1
+                if ch == curses.KEY_RIGHT:
+                    textpos_x += 5
+                if ch == curses.KEY_LEFT:
+                    textpos_x -= 5
+                if ch == ord('\n'):
+                    textpos_y += 1
+                if ch == ord(' '):
+                    textpos_y += rows - 5
+                if ch == curses.KEY_NPAGE:
+                    textpos_y += rows - 2
+                if ch == curses.KEY_PPAGE:
+                    textpos_y -= rows - 2
+                if ch == ord('['):
+                    pos_cur -= 1
+                    handle_transaction_view()
+                if ch == ord(']'):
+                    pos_cur += 1
+                    handle_transaction_view()
+        except discuss.DiscussError as err:
+            status_bar = str(err).split("\n")[0]
 
         redraw()
 
