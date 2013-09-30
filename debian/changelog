@@ -1,3 +1,11 @@
+debathena-discuss-ng (1.1-0debathena1) unstable; urgency=low
+
+  * ndsc supports deletion and undeletion.
+  * ndsc has Vim-style keybindings.
+  * ndsc has "refresh" command to load new transactions.
+
+ -- Victor Vasiliev <vasilvv@mit.edu>  Mon, 30 Sep 2013 04:50:44 -0400
+
 debathena-discuss-ng (1.0-0debathena1) unstable; urgency=low
 
   * Initial release.
