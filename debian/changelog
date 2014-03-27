@@ -1,3 +1,9 @@
+debathena-discuss-ng (1.1.1-0debathena1) unstable; urgency=low
+
+  * Fix bounds checking on '[' and ']'
+
+ -- Victor Vasiliev <vasilvv@mit.edu>  Thu, 27 Mar 2014 18:50:42 -0400
+
 debathena-discuss-ng (1.1-0debathena1) unstable; urgency=low
 
   * ndsc supports deletion and undeletion.
