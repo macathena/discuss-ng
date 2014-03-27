@@ -338,9 +338,11 @@ def main_loop():
                     textpos_y -= rows - 2
                 if ch == ord('['):
                     pos_cur -= 1
+                    pos_cur = max(pos_cur, 0)
                     handle_transaction_view()
                 if ch == ord(']'):
                     pos_cur += 1
+                    pos_cur = min(pos_cur, len(transactions) - 1)
                     handle_transaction_view()
         except discuss.DiscussError as err:
             status_bar = str(err).split("\n")[0]
