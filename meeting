@@ -1,5 +1,5 @@
 #!/usr/bin/python
-
+from __future__ import print_function
 #
 # A simple tool to manage the discuss meetings.
 #
@@ -45,10 +45,10 @@ def list_meetings():
         meetings = [ "%s [%s]" % ( entry['displayname'], ", ".join(entry['names']) )
                 for entry in rcfile.entries.values() if entry['hostname'] == server ]
         meetings.sort()
-        print "--- Meetings on %s ---" % server
+        print("--- Meetings on %s ---" % server)
         for meeting in meetings:
-            print "* %s" % meeting
-        print ""
+            print("* %s" % meeting)
+        print("")
 
 def get_meeting(name):
     rcfile = discuss.RCFile()
@@ -66,10 +66,10 @@ def list_acl():
     acl = meeting.get_acl()
     acl.sort(key = lambda acl: acl[0])
 
-    print "%s   Principal" % acl_flags
-    print "%s   ---------" % ("-" * len(acl_flags))
+    print("%s   Principal" % acl_flags)
+    print("%s   ---------" % ("-" * len(acl_flags)))
     for principal, modes in acl:
-        print "%s   %s" % (modes, principal)
+        print("%s   %s" % (modes, principal))
 
 def set_acl():
     meeting = get_meeting(args.meeting)
@@ -96,7 +96,7 @@ def complete():
 
     meetings = [entry['displayname'] for entry in rcfile.entries.values() if entry['displayname'].startswith(args.prefix)]
     meetings.sort()
-    print " ".join( meetings )
+    print(" ".join( meetings ))
 
 def parse_args():
     global args

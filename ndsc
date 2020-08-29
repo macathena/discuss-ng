@@ -98,9 +98,10 @@ def format_transaction_row(trn, width):
 
     def truncate_column(text, maxlen):
         if len(text) <= maxlen:
-            return pad(text, maxlen)
+            return str(pad(text, maxlen))
         else:
-            return text[0:maxlen-1] + '…'
+            # python 2 can't concatenate unicode and str-containing-unicode
+            return str(text[0:maxlen-1]) + '…'
 
     number_column = pad(str(trn.number), number_column_len, True)
     sender_column = truncate_column(trn.signature, sender_column_len)

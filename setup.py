@@ -1,9 +1,9 @@
 #!/usr/bin/python
 
-from distutils.core import setup
+from setuptools import setup
 
 setup(name='discuss-ng',
-      version='1.1.1',
+      version='1.2',
       description='User interface front-end to the discuss network forum system',
       author='Victor Vasiliev',
       scripts=['meeting', 'ndsc']
